@@ -23,9 +23,10 @@ import { AlertCircle, ChevronDown, Database, Clock, Hash, Shield, Activity, PieC
 
 interface BlockchainGraphsProps {
   data: BlockchainData | null;
+  bankaiMode?: boolean;
 }
 
-const BlockchainGraphs = ({ data }: BlockchainGraphsProps) => {
+const BlockchainGraphs = ({ data, bankaiMode = false }: BlockchainGraphsProps) => {
   const [blockTimeData, setBlockTimeData] = useState<any[]>([]);
   const [blockSizeData, setBlockSizeData] = useState<any[]>([]);
   const [attackTypeData, setAttackTypeData] = useState<any[]>([]);
@@ -39,8 +40,13 @@ const BlockchainGraphs = ({ data }: BlockchainGraphsProps) => {
   const [countryData, setCountryData] = useState<any[]>([]);
   const previousDataRef = useRef<BlockchainData | null>(null);
 
-  // Function to transform unknown attack types to specific types
+  // Function to transform unknown attack types to specific types - Only if not in bankaiMode
   const transformAttackType = (attackType: string, id: string): string => {
+    if (bankaiMode) {
+      // In Bankai mode, don't transform attack types
+      return attackType || 'Unknown';
+    }
+    
     if (!attackType || attackType.toLowerCase() === 'unknown') {
       // Common attack types to replace unknown
       const attackTypes = [

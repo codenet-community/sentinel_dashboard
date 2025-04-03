@@ -32,7 +32,9 @@ const BlockchainAnalytics = () => {
     apiConnected,
     blockchainConnected,
     connectToSources,
-    disconnect
+    disconnect,
+    bankaiMode,
+    setBankaiMode
   } = useThreatData(persistedSettings);
   
   // Connect to sources when settings are available and connection is not active
@@ -105,6 +107,8 @@ const BlockchainAnalytics = () => {
           soundVolume={0}
           setSoundVolume={() => {}}
           connectionError={connectionError}
+          bankaiMode={bankaiMode}
+          setBankaiMode={setBankaiMode}
         />
         
         <main className="container mx-auto pt-24 pb-16 px-4 sm:px-6">
@@ -172,7 +176,7 @@ const BlockchainAnalytics = () => {
                 </div>
               </div>
             ) : (
-              <BlockchainGraphs data={blockchainData} />
+              <BlockchainGraphs data={blockchainData} bankaiMode={bankaiMode} />
             )}
           </div>
         </main>

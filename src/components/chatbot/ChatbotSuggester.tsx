@@ -500,7 +500,7 @@ What specific aspect would you like me to analyze further?`;
                 variant="ghost"
                 size="sm"
                 className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
-                onClick={() => handleNavigation('/cyberguard-dashboard')}
+                onClick={() => handleNavigation('/cyber-guard')}
               >
                 <Shield className="h-4 w-4" />
                 <span>CyberGuard</span>

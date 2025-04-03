@@ -22,6 +22,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/blockchain-analytics" element={<BlockchainAnalytics />} />
             <Route path="/cyber-guard" element={<CyberGuardDashboard />} />
+            <Route path="/cyberguard" element={<CyberGuardDashboard />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
