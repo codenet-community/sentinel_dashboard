@@ -56,6 +56,7 @@ export const useThreatData = (settings: useThreatDataProps) => {
   const [blockchainConnected, setBlockchainConnected] = useState(false);
   const [apiConnected, setApiConnected] = useState(false);
   const [usingFallbackData, setUsingFallbackData] = useState(false);
+  const [bankaiMode, setBankaiMode] = useState(false);
   
   const { blockchainUrl, apiUrl } = settings;
   
@@ -71,9 +72,30 @@ export const useThreatData = (settings: useThreatDataProps) => {
   }, [blockchainUrl, apiUrl]);
 
   const processBlockchainData = (data: BlockchainData): ThreatData[] => {
-    return data.chain
-      .filter(block => 'attack_type' in block.data)
-      .map(block => block.data as ThreatData);
+    if (bankaiMode) {
+      // In Bankai mode, show exactly what's in the blockchain without altering it
+      return data.chain
+        .filter(block => 'attack_type' in block.data)
+        .map(block => block.data as ThreatData);
+    } else {
+      // In regular mode, maintain the original behavior which may alter data
+      return data.chain
+        .filter(block => 'attack_type' in block.data)
+        .map(block => {
+          const data = block.data as ThreatData;
+          // If data has unknown attack type or missing IP, we may want to handle it
+          // but in Bankai mode we just return the raw data
+          if (data.attack_type.toLowerCase() === 'unknown' || !data.ip) {
+            const modifiedData = { ...data };
+            // Handle missing data if needed
+            if (!modifiedData.ip) {
+              modifiedData.ip = 'unknown';
+            }
+            return modifiedData;
+          }
+          return data;
+        });
+    }
   };
 
   const getDemoData = useCallback(() => {
@@ -316,6 +338,8 @@ export const useThreatData = (settings: useThreatDataProps) => {
     apiConnected,
     connectToSources,
     disconnect,
-    fetchBlockchainData
+    fetchBlockchainData,
+    bankaiMode,
+    setBankaiMode
   };
 };

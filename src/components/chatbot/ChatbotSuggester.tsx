@@ -52,9 +52,10 @@ interface ChatbotSuggesterProps {
   isConnected: boolean;
   className?: string;
   onBack?: () => void;
+  bankaiMode?: boolean;
 }
 
-const ChatbotSuggester = ({ blockchainData, isConnected, className, onBack }: ChatbotSuggesterProps) => {
+const ChatbotSuggester = ({ blockchainData, isConnected, className, onBack, bankaiMode = false }: ChatbotSuggesterProps) => {
   console.log('ChatbotSuggester rendering, isConnected:', isConnected);
   console.log('blockchainData available:', !!blockchainData);
   
@@ -110,7 +111,7 @@ const ChatbotSuggester = ({ blockchainData, isConnected, className, onBack }: Ch
     if (blockchainData && blockchainData.chain && Array.isArray(blockchainData.chain) && blockchainData.chain.length > 0) {
       try {
         console.log('Chain length:', blockchainData.chain.length);
-        const processedData = enrichThreatData(blockchainData);
+        const processedData = enrichThreatData(blockchainData, bankaiMode);
         setEnrichedData(processedData);
         console.log('Enriched blockchain data:', processedData);
         
@@ -133,7 +134,7 @@ const ChatbotSuggester = ({ blockchainData, isConnected, className, onBack }: Ch
     } else {
       console.log('No blockchain data available or chain is empty');
     }
-  }, [blockchainData]);
+  }, [blockchainData, bankaiMode]);
   
   // Auto-scroll to bottom of messages
   useEffect(() => {
@@ -161,7 +162,7 @@ const ChatbotSuggester = ({ blockchainData, isConnected, className, onBack }: Ch
     const normalizedQuery = userQuery.toLowerCase();
     
     // Extract threat data using utility function
-    const threatData = extractThreatData(blockchainData);
+    const threatData = extractThreatData(blockchainData, bankaiMode);
     console.log('Analyzed threat blocks:', threatData.length);
     
     // Check if query is asking for specific attack type details

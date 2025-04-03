@@ -28,6 +28,8 @@ interface SettingsPanelProps {
   soundVolume: number;
   setSoundVolume: (volume: number) => void;
   connectionError: string | null;
+  bankaiMode?: boolean;
+  setBankaiMode?: (enabled: boolean) => void;
 }
 
 export const SettingsPanel = ({
@@ -42,7 +44,9 @@ export const SettingsPanel = ({
   setNotificationsEnabled = () => {},
   soundVolume = 70,
   setSoundVolume = () => {},
-  connectionError = null
+  connectionError = null,
+  bankaiMode = false,
+  setBankaiMode = () => {}
 }: SettingsPanelProps) => {
   const [apiKey, setApiKey] = useState(connectionSettings.apiKey || '');
   const [apiUrl, setApiUrl] = useState(connectionSettings.apiUrl || '');
@@ -171,6 +175,17 @@ export const SettingsPanel = ({
                 id="test-mode"
                 checked={useDemoData}
                 onCheckedChange={handleDemoToggle}
+              />
+            </div>
+            
+            <div className="flex items-center justify-between pb-4 border-b border-border">
+              <div className="space-y-0.5">
+                <Label htmlFor="bankai-mode">Bankai Mode</Label>
+              </div>
+              <Switch
+                id="bankai-mode"
+                checked={bankaiMode}
+                onCheckedChange={setBankaiMode}
               />
             </div>
             

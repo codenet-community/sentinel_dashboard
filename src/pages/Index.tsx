@@ -131,7 +131,9 @@ const Index = () => {
     connectToSources,
     disconnect,
     fetchThreatData,
-    fetchBlockchainData
+    fetchBlockchainData,
+    bankaiMode,
+    setBankaiMode
   } = useThreatData(persistedSettings);
   
   const toggleSound = useCallback(() => {
@@ -228,6 +230,8 @@ const Index = () => {
           setSoundVolume={setSoundVolume}
           connectionError={connectionError}
           ref={settingsTriggerRef}
+          bankaiMode={bankaiMode}
+          setBankaiMode={setBankaiMode}
         />
         
         <main className="container mx-auto pt-24 pb-16 px-4 sm:px-6">
@@ -288,7 +292,7 @@ const Index = () => {
                           <h2 className="text-lg font-medium">Live Attack Feed</h2>
                         </div>
                         <div className="flex-grow overflow-auto p-0">
-                          <LiveAttackFeed threats={threatData} />
+                          <LiveAttackFeed threats={threatData} currentAlert={currentAlert} bankaiMode={bankaiMode} />
                         </div>
                       </div>
                     </div>
@@ -312,7 +316,7 @@ const Index = () => {
                         <h2 className="text-lg font-medium">Blockchain Ledger</h2>
                       </div>
                       <div className="h-[calc(100%-61px)] overflow-auto">
-                        <BlockchainViewer data={blockchainData} />
+                        <BlockchainViewer data={blockchainData} bankaiMode={bankaiMode} />
                         {blockchainData && blockchainData.chain.length > 0 && (
                           <div className="flex justify-center mt-4 pb-4">
                             <button 
@@ -327,7 +331,7 @@ const Index = () => {
                     </div>
                   </div>
                   <div className="md:col-span-4 h-[400px]">
-                    <BlockedIPs />
+                    <BlockedIPs apiConnected={apiConnected} />
                   </div>
                 </section>
 
@@ -341,6 +345,13 @@ const Index = () => {
                     </div>
                   </div>
                 </section>
+
+                <div className="grid grid-cols-1 gap-6">
+                  <ThreatMap 
+                    threats={threatData} 
+                    bankaiMode={bankaiMode}
+                  />
+                </div>
               </>
             )}
           </div>

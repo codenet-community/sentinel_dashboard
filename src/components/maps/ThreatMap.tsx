@@ -1,17 +1,36 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { ThreatData } from '@/hooks/useThreatData';
 import { cn } from '@/lib/utils';
 
 interface ThreatMapProps {
   threats: ThreatData[];
+  bankaiMode?: boolean;
 }
 
 // A simple map visualization with threat points
-const ThreatMap = ({ threats }: ThreatMapProps) => {
+const ThreatMap = ({ threats, bankaiMode = false }: ThreatMapProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [showHeatmap, setShowHeatmap] = useState(true);
   const [animationFrame, setAnimationFrame] = useState<number | null>(null);
+  
+  // Replace any processing of data with conditional logic
+  // For example, if there's a function to transform IPs or attack types, add bankaiMode condition
+  
+  // When processing/transforming attack data for display, add bankaiMode check
+  const processedThreats = useMemo(() => {
+    return threats.map(threat => {
+      // If in Bankai mode, don't transform anything - use raw data
+      if (bankaiMode) {
+        return { ...threat };
+      }
+      
+      // Apply normal transformations for regular mode
+      // (Add your existing transformation logic here)
+      
+      return threat;
+    });
+  }, [threats, bankaiMode]);
   
   // Draw function that renders the world map and attack points
   const draw = () => {
@@ -54,7 +73,7 @@ const ThreatMap = ({ threats }: ThreatMapProps) => {
     }
     
     // If no threat data, draw placeholder
-    if (threats.length === 0) {
+    if (processedThreats.length === 0) {
       ctx.fillStyle = 'rgba(100, 100, 100, 0.5)';
       ctx.font = '14px SF Pro Display, sans-serif';
       ctx.textAlign = 'center';
@@ -63,7 +82,7 @@ const ThreatMap = ({ threats }: ThreatMapProps) => {
     }
     
     // Draw threat points
-    threats.forEach((threat) => {
+    processedThreats.forEach((threat) => {
       if (!threat.coordinates) return;
       
       // Convert lat/lng to canvas x/y
@@ -170,7 +189,7 @@ const ThreatMap = ({ threats }: ThreatMapProps) => {
         cancelAnimationFrame(animationFrame);
       }
     };
-  }, [threats, showHeatmap]);
+  }, [processedThreats, showHeatmap]);
   
   // Redraw on window resize
   useEffect(() => {
@@ -213,7 +232,7 @@ const ThreatMap = ({ threats }: ThreatMapProps) => {
           className="w-full h-full absolute inset-0 dark:bg-gray-900/50"
         />
         
-        {threats.length === 0 && (
+        {processedThreats.length === 0 && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
               <AlertTriangle className="mx-auto h-10 w-10 text-muted-foreground opacity-20" />

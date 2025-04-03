@@ -10,9 +10,11 @@ import { ATTACK_TYPES, transformAttackType, generateConsistentIP, addBlockedIP }
 
 interface LiveAttackFeedProps {
   threats: ThreatData[];
+  currentAlert?: ThreatData | null;
+  bankaiMode?: boolean;
 }
 
-export const LiveAttackFeed = ({ threats }: LiveAttackFeedProps) => {
+export const LiveAttackFeed = ({ threats, currentAlert, bankaiMode = false }: LiveAttackFeedProps) => {
   const [filter, setFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
   
   const getIconForAttackType = (attackType: string) => {
@@ -46,6 +48,11 @@ export const LiveAttackFeed = ({ threats }: LiveAttackFeedProps) => {
   
   // Process the threats to replace unknown attack types and ensure consistent IPs
   const processedThreats = threats.map(threat => {
+    // If in Bankai mode, don't transform anything - use raw data
+    if (bankaiMode) {
+      return { ...threat };
+    }
+    
     const transformedAttackType = transformAttackType(threat.attack_type, threat.id);
     
     // Generate consistent IP if it's an unknown attack type or missing IP

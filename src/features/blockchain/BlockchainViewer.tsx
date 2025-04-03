@@ -11,6 +11,7 @@ import { transformAttackType, generateConsistentIP, addBlockedIP } from '@/utils
 
 interface BlockchainViewerProps {
   data: BlockchainData | null;
+  bankaiMode?: boolean;
 }
 
 const shortenHash = (hash: string) => {
@@ -22,12 +23,14 @@ const BlockchainBlock = ({
   block, 
   index, 
   isLatest,
-  totalBlocks
+  totalBlocks,
+  bankaiMode = false
 }: { 
   block: any; 
   index: number; 
   isLatest: boolean;
   totalBlocks: number;
+  bankaiMode?: boolean;
 }) => {
   const [expanded, setExpanded] = useState(isLatest);
   const blockTime = new Date(block.timestamp);
@@ -59,17 +62,22 @@ const BlockchainBlock = ({
   const renderExpandedContent = () => {
     // For attack data
     if (block.data?.attack_type) {
-      const transformedAttackType = transformAttackType(block.data.attack_type, block.data.id || block.hash);
+      let attackType = '';
+      let severity = '';
+      let source = '';
       
-      // Generate consistent IP if it's an unknown attack type
-      let ip = block.data.ip;
-      if (block.data.attack_type.toLowerCase() === 'unknown' || !block.data.ip) {
-        ip = generateConsistentIP(block.data.id || block.hash);
-        // Add this IP to blocked IPs list
-        addBlockedIP(ip);
-      } else {
-        // Add any malicious IP to the blocked list
-        addBlockedIP(block.data.ip);
+      if ('attack_type' in block.data) {
+        // Use original data in bankai mode, otherwise transform
+        attackType = bankaiMode 
+          ? block.data.attack_type 
+          : transformAttackType(block.data.attack_type, block.data.id);
+        
+        severity = block.data.severity;
+        
+        // Use original IP in bankai mode, otherwise may generate one
+        source = bankaiMode || block.data.ip
+          ? block.data.ip 
+          : generateConsistentIP(block.data.id);
       }
       
       // Transform Unknown status to Detected
@@ -82,23 +90,23 @@ const BlockchainBlock = ({
           <div className="flex items-center">
             <Shield className="h-3.5 w-3.5 text-red-500 mr-1.5" />
             <span className="font-medium">Attack Type:</span>
-            <span className="ml-2">{transformedAttackType}</span>
+            <span className="ml-2">{attackType}</span>
           </div>
           
           <div className="flex items-center">
             <ServerIcon className="h-3.5 w-3.5 text-blue-500 mr-1.5" />
             <span className="font-medium">Source IP:</span>
-            <span className="ml-2 font-mono">{ip}</span>
+            <span className="ml-2 font-mono">{source}</span>
           </div>
           
           <div className="flex items-center">
             <BarChart className="h-3.5 w-3.5 text-orange-500 mr-1.5" />
             <span className="font-medium">Severity:</span>
             <span className={`ml-2 ${
-              block.data.severity === 'High' ? 'text-red-500' : 
-              block.data.severity === 'Medium' ? 'text-orange-500' : 'text-green-500'
+              severity === 'High' ? 'text-red-500' : 
+              severity === 'Medium' ? 'text-orange-500' : 'text-green-500'
             }`}>
-              {block.data.severity}
+              {severity}
             </span>
           </div>
 
@@ -222,7 +230,7 @@ const BlockchainBlock = ({
   );
 };
 
-const BlockchainViewer = ({ data }: BlockchainViewerProps) => {
+const BlockchainViewer = ({ data, bankaiMode = false }: BlockchainViewerProps) => {
   const [visibleBlocks, setVisibleBlocks] = useState(3);
   const navigate = useNavigate();
   
@@ -290,6 +298,7 @@ const BlockchainViewer = ({ data }: BlockchainViewerProps) => {
                 index={index} 
                 isLatest={index === 0}
                 totalBlocks={data.chain.length - 1}
+                bankaiMode={bankaiMode}
               />
             ))}
             

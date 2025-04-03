@@ -24,6 +24,8 @@ interface HeaderProps {
   connectionError?: string | null;
   title?: string;
   subtitle?: string;
+  bankaiMode?: boolean;
+  setBankaiMode?: (enabled: boolean) => void;
 }
 
 const Header = forwardRef<HTMLButtonElement, HeaderProps>(function Header(
@@ -41,7 +43,9 @@ const Header = forwardRef<HTMLButtonElement, HeaderProps>(function Header(
     setSoundVolume,
     connectionError,
     title = "Sentinel",
-    subtitle
+    subtitle,
+    bankaiMode = false,
+    setBankaiMode
   },
   ref
 ) {
@@ -140,6 +144,8 @@ const Header = forwardRef<HTMLButtonElement, HeaderProps>(function Header(
                       soundVolume={soundVolume}
                       setSoundVolume={setSoundVolume || (() => {})}
                       connectionError={connectionError || null}
+                      bankaiMode={bankaiMode}
+                      setBankaiMode={setBankaiMode || (() => {})}
                     />
                   )}
                 </DialogContent>

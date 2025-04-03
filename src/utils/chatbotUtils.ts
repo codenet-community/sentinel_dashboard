@@ -4,7 +4,7 @@ import { ATTACK_TYPES, transformAttackType, generateConsistentIP, addBlockedIP }
 /**
  * Extracts ThreatData from BlockchainData
  */
-export const extractThreatData = (blockchainData: BlockchainData | null): ThreatData[] => {
+export const extractThreatData = (blockchainData: BlockchainData | null, bankaiMode: boolean = false): ThreatData[] => {
   if (!blockchainData || !blockchainData.chain) return [];
   
   return blockchainData.chain
@@ -15,6 +15,13 @@ export const extractThreatData = (blockchainData: BlockchainData | null): Threat
     )
     .map(block => {
       const data = block.data as ThreatData;
+      
+      if (bankaiMode) {
+        // In Bankai mode, return the data exactly as is from the blockchain
+        return data;
+      }
+      
+      // Regular processing with transformations for normal mode
       const transformedAttackType = transformAttackType(data.attack_type, data.id);
       
       // Generate consistent IP if it's an unknown attack type
@@ -239,8 +246,8 @@ export const generateSecurityInsights = (threatData: ThreatData[]) => {
 /**
  * Enriches blockchain data with additional analysis
  */
-export const enrichThreatData = (blockchainData: BlockchainData | null) => {
-  const threatData = extractThreatData(blockchainData);
+export const enrichThreatData = (blockchainData: BlockchainData | null, bankaiMode: boolean = false) => {
+  const threatData = extractThreatData(blockchainData, bankaiMode);
   if (!threatData.length) return null;
   
   return {
