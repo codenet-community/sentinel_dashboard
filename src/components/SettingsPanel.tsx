@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { 
   Bell, 
   Moon, 
@@ -14,7 +14,13 @@ import {
   Globe,
   Server,
   ExternalLink,
-  AlertTriangle
+  AlertTriangle,
+  Flame,
+  Database as DatabaseIcon,
+  Check,
+  X,
+  Loader2,
+  Paintbrush
 } from 'lucide-react';
 import { 
   Dialog, 
@@ -30,17 +36,26 @@ import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useTheme } from '@/components/theme-provider';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { toast } from '@/components/ui/use-toast';
+
+// Add Firebase imports
+import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, set } from 'firebase/database';
 
 interface SettingsTabProps {
   icon: LucideIcon;
   label: string;
   active: boolean;
   onClick: () => void;
+  className?: string;
 }
 
-const SettingsTab = ({ icon: Icon, label, active, onClick }: SettingsTabProps) => (
+const SettingsTab = ({ icon: Icon, label, active, onClick, className = '' }: SettingsTabProps) => (
   <button 
-    className={`settings-tab ${active ? 'active' : ''}`}
+    className={`settings-tab ${active ? 'active' : ''} ${className}`}
     onClick={onClick}
   >
     <Icon className="h-4 w-4" />
@@ -64,7 +79,7 @@ interface SettingsPanelProps {
   setNotificationsEnabled: (enabled: boolean) => void;
   soundVolume: number;
   setSoundVolume: (volume: number) => void;
-  connectionError?: string | null;
+  connectionError: string | null;
 }
 
 const SettingsPanel = ({
@@ -82,17 +97,23 @@ const SettingsPanel = ({
   connectionError
 }: SettingsPanelProps) => {
   const { theme, setTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState('connection');
-  const [apiKey, setApiKey] = useState(connectionSettings.apiKey);
-  const [apiUrl, setApiUrl] = useState(connectionSettings.apiUrl);
-  const [blockchainUrl, setBlockchainUrl] = useState(connectionSettings.blockchainUrl);
-  const [isOpen, setIsOpen] = useState(false);
-  const [apiInputMode, setApiInputMode] = useState<'full' | 'host'>('full');
-  const [blockchainInputMode, setBlockchainInputMode] = useState<'full' | 'host'>('full');
-  const [apiHost, setApiHost] = useState('');
-  const [blockchainHost, setBlockchainHost] = useState('');
-  const [apiPath, setApiPath] = useState('/fake-attacks');
-  const [blockchainPath, setBlockchainPath] = useState('/chain');
+  const [activeTab, setActiveTab] = useState('firebase');
+  
+  // Firebase state
+  const [firebaseConnected, setFirebaseConnected] = useState(false);
+  const [isFirebaseConnecting, setIsFirebaseConnecting] = useState(false);
+  const [firebaseError, setFirebaseError] = useState<string | null>(null);
+  const firebaseAppRef = useRef<any>(null);
+  const firebaseDatabaseRef = useRef<any>(null);
+  
+  // Firebase configuration fields
+  const [firebaseApiKey, setFirebaseApiKey] = useState("AIzaSyBSbonwVE3PPXIIrSrvrB75u2AQ_B_Tni4");
+  const [firebaseAuthDomain, setFirebaseAuthDomain] = useState("discraft-c1c41.firebaseapp.com");
+  const [firebaseDatabaseURL, setFirebaseDatabaseURL] = useState("https://discraft-c1c41-default-rtdb.firebaseio.com");
+  const [firebaseProjectId, setFirebaseProjectId] = useState("discraft-c1c41");
+  const [firebaseStorageBucket, setFirebaseStorageBucket] = useState("discraft-c1c41.appspot.com");
+  const [firebaseMessagingSenderId, setFirebaseMessagingSenderId] = useState("525620150766");
+  const [firebaseAppId, setFirebaseAppId] = useState("1:525620150766:web:a426e68d206c68764aceff");
 
   useEffect(() => {
     setApiKey(connectionSettings.apiKey || '');
@@ -155,363 +176,391 @@ const SettingsPanel = ({
     setIsOpen(false);
   };
 
-  return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full fixed left-4 top-4 z-50">
-          <Settings className="h-5 w-5" />
-          <span className="sr-only">Settings</span>
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Dashboard Settings</DialogTitle>
-        </DialogHeader>
+  // Firebase connection function
+  const connectToFirebase = () => {
+    console.log('🔥 Attempting to connect to Firebase...');
+    setIsFirebaseConnecting(true);
+    setFirebaseError(null);
+    
+    try {
+      // Log all config values (without sensitive info)
+      console.log('🔥 Firebase configuration:', {
+        authDomain: firebaseAuthDomain,
+        databaseURL: firebaseDatabaseURL,
+        projectId: firebaseProjectId,
+        storageBucket: firebaseStorageBucket
+      });
+      
+      if (!firebaseAppRef.current) {
+        console.log('🔥 No existing Firebase app found, initializing new connection');
+        // Initialize Firebase with configuration
+        const firebaseConfig = {
+          apiKey: firebaseApiKey,
+          authDomain: firebaseAuthDomain,
+          databaseURL: firebaseDatabaseURL,
+          projectId: firebaseProjectId,
+          storageBucket: firebaseStorageBucket,
+          messagingSenderId: firebaseMessagingSenderId,
+          appId: firebaseAppId
+        };
         
-        <div className="flex mt-4">
-          <div className="w-1/4 space-y-2 pr-4 border-r border-border">
-            <SettingsTab 
-              icon={Link2} 
-              label="Connection" 
-              active={activeTab === 'connection'} 
-              onClick={() => setActiveTab('connection')} 
-            />
-            <SettingsTab 
-              icon={Bell} 
-              label="General" 
-              active={activeTab === 'general'} 
-              onClick={() => setActiveTab('general')} 
-            />
-          </div>
+        // Initialize Firebase
+        try {
+          console.log('🔥 Initializing Firebase app...');
+          firebaseAppRef.current = initializeApp(firebaseConfig);
+          console.log('🔥 Firebase app initialized successfully:', firebaseAppRef.current.name);
+        } catch (initError) {
+          console.error('🔥 Error initializing Firebase app:', initError);
+          throw new Error(`Firebase initialization failed: ${(initError as Error).message}`);
+        }
+        
+        // Get a reference to the database service
+        try {
+          console.log('🔥 Getting database reference...');
+          firebaseDatabaseRef.current = getDatabase(firebaseAppRef.current);
+          console.log('🔥 Database reference obtained successfully');
+        } catch (dbError) {
+          console.error('🔥 Error getting database reference:', dbError);
+          throw new Error(`Database connection failed: ${(dbError as Error).message}`);
+        }
+        
+        console.log('🔥 Firebase initialized successfully from Settings');
+        
+        // Set connection status
+        setFirebaseConnected(true);
+        
+        // Log connection time
+        const connectTime = new Date().toISOString();
+        console.log('🔥 Logging connection timestamp:', connectTime);
+        try {
+          set(ref(firebaseDatabaseRef.current, 'lastConnect'), {
+            timestamp: connectTime,
+            client: 'Sentinel Dashboard Settings',
+            status: 'connected'
+          }).then(() => {
+            console.log('🔥 Connection logged successfully to Firebase');
+          }).catch((error) => {
+            console.error('🔥 Error logging connection to Firebase:', error);
+          });
+        } catch (refError) {
+          console.error('🔥 Error creating reference for lastConnect:', refError);
+        }
+        
+        // Notify success
+        console.log('🔥 Dispatching firebase-connected event (connected: true)');
+        window.dispatchEvent(new CustomEvent('firebase-connected', { 
+          detail: { 
+            connected: true,
+            app: firebaseAppRef.current,
+            database: firebaseDatabaseRef.current
+          } 
+        }));
+      } else {
+        console.log('🔥 Firebase already initialized from Settings, reusing existing connection');
+        setFirebaseConnected(true);
+        
+        // Re-notify success with existing connection
+        console.log('🔥 Dispatching firebase-connected event with existing connection');
+        window.dispatchEvent(new CustomEvent('firebase-connected', { 
+          detail: { 
+            connected: true,
+            app: firebaseAppRef.current,
+            database: firebaseDatabaseRef.current
+          } 
+        }));
+      }
+    } catch (error) {
+      console.error('🔥 Firebase initialization error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown connection error';
+      setFirebaseError(errorMessage);
+      setFirebaseConnected(false);
+      
+      // Notify failure
+      console.log('🔥 Dispatching firebase-connected event (connected: false)');
+      window.dispatchEvent(new CustomEvent('firebase-connected', { 
+        detail: { connected: false, error: errorMessage } 
+      }));
+    } finally {
+      console.log('🔥 Firebase connection attempt completed');
+      setIsFirebaseConnecting(false);
+    }
+  };
+
+  // Disconnect from Firebase
+  const disconnectFromFirebase = () => {
+    console.log('🔥 Attempting to disconnect from Firebase...');
+    if (firebaseAppRef.current) {
+      try {
+        // Log disconnection
+        if (firebaseDatabaseRef.current) {
+          console.log('🔥 Logging disconnection to Firebase');
+          set(ref(firebaseDatabaseRef.current, 'lastConnect'), {
+            timestamp: new Date().toISOString(),
+            client: 'Sentinel Dashboard Settings',
+            status: 'disconnected'
+          }).catch((error) => {
+            console.error('🔥 Error logging disconnection:', error);
+          });
+        }
+        
+        // Reset references
+        console.log('🔥 Resetting Firebase app and database references');
+        firebaseAppRef.current = null;
+        firebaseDatabaseRef.current = null;
+        setFirebaseConnected(false);
+        
+        console.log('🔥 Successfully disconnected from Firebase');
+        
+        // Notify disconnection
+        console.log('🔥 Dispatching firebase-connected event (connected: false)');
+        window.dispatchEvent(new CustomEvent('firebase-connected', { 
+          detail: { connected: false } 
+        }));
+      } catch (error) {
+        console.error('🔥 Error disconnecting from Firebase:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown disconnection error';
+        setFirebaseError(errorMessage);
+      }
+    } else {
+      console.log('🔥 No active Firebase connection to disconnect');
+    }
+  };
+
+  return (
+    <Sheet>
+      <SheetTrigger id="settings-trigger" asChild>
+        <Button variant="ghost" size="icon" className="relative">
+          <Settings className="h-5 w-5" />
+          {connectionError && (
+            <span className="absolute -top-1 -right-1 block h-2.5 w-2.5 rounded-full bg-red-600 border border-white" />
+          )}
+        </Button>
+      </SheetTrigger>
+      <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>
+            <div className="flex items-center">
+              Settings
+              {connectionError && (
+                <Badge variant="destructive" className="ml-2 gap-1 px-1.5 py-0">
+                  <span className="rounded-full h-1.5 w-1.5 bg-white"></span>
+                  <span className="text-xs">Error</span>
+                </Badge>
+              )}
+            </div>
+          </SheetTitle>
+          <SheetDescription>
+            Configure your dashboard settings and connections.
+          </SheetDescription>
+        </SheetHeader>
+        
+        <Tabs className="mt-6" value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="firebase" className="text-xs">
+              <Flame className="mr-1 h-3.5 w-3.5" />
+              Firebase
+            </TabsTrigger>
+            <TabsTrigger value="appearance" className="text-xs">
+              <Paintbrush className="mr-1 h-3.5 w-3.5" />
+              Appearance
+            </TabsTrigger>
+            <TabsTrigger value="notifications" className="text-xs">
+              <Bell className="mr-1 h-3.5 w-3.5" />
+              Notifications
+            </TabsTrigger>
+          </TabsList>
           
-          <div className="w-3/4 pl-6">
-            {activeTab === 'general' && (
-              <div className="space-y-6">
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium">Theme</h3>
-                  <div className="flex items-center gap-4">
-                    <Button
-                      variant={theme === 'light' ? 'default' : 'outline'}
-                      size="sm"
-                      className="gap-1"
-                      onClick={() => setTheme('light')}
-                    >
-                      <Sun className="h-4 w-4" />
-                      Light
-                    </Button>
-                    <Button
-                      variant={theme === 'dark' ? 'default' : 'outline'}
-                      size="sm"
-                      className="gap-1"
-                      onClick={() => setTheme('dark')}
-                    >
-                      <Moon className="h-4 w-4" />
-                      Dark
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium">Notifications</h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="notifications" className="flex items-center gap-2">
-                        <Bell className="h-4 w-4" />
-                        Enable Notifications
-                      </Label>
-                      <Switch 
-                        id="notifications" 
-                        checked={notificationsEnabled} 
-                        onCheckedChange={setNotificationsEnabled} 
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Show alerts when new threats are detected
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium">Sound Alerts</h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label htmlFor="sound-toggle" className="flex items-center gap-2">
-                        {soundEnabled ? (
-                          <Volume2 className="h-4 w-4" />
-                        ) : (
-                          <VolumeX className="h-4 w-4" />
-                        )}
-                        Enable Sound Alerts
-                      </Label>
-                      <Switch 
-                        id="sound-toggle" 
-                        checked={soundEnabled} 
-                        onCheckedChange={setSoundEnabled} 
-                      />
-                    </div>
-                    
-                    <div className="pt-2">
-                      <Label htmlFor="sound-volume" className="text-xs text-muted-foreground pb-2 block">
-                        Alert Volume
-                      </Label>
-                      <div className="flex items-center gap-4">
-                        <VolumeX className="h-3 w-3 text-muted-foreground" />
-                        <Slider
-                          id="sound-volume"
-                          defaultValue={[soundVolume]}
-                          max={100}
-                          step={1}
-                          disabled={!soundEnabled}
-                          onValueChange={(value) => setSoundVolume(value[0])}
-                          className="flex-1"
-                        />
-                        <Volume2 className="h-3 w-3 text-muted-foreground" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+          <TabsContent value="firebase" className="space-y-6 animate-in fade-in-50 duration-300">
+            {firebaseError && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="ml-2">
+                  {firebaseError}
+                </AlertDescription>
+              </Alert>
             )}
             
-            {activeTab === 'connection' && (
-              <div className="space-y-6">
-                {connectionError && (
-                  <Alert variant="destructive" className="mb-4">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription className="ml-2">
-                      {connectionError}
-                    </AlertDescription>
-                  </Alert>
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Firebase Configuration</h3>
+              <div className="grid gap-2">
+                <Label htmlFor="firebase-apiKey">API Key</Label>
+                <Input 
+                  id="firebase-apiKey" 
+                  value={firebaseApiKey} 
+                  onChange={e => setFirebaseApiKey(e.target.value)}
+                  disabled={firebaseConnected || isFirebaseConnecting}
+                  placeholder="Firebase API Key" 
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="firebase-authDomain">Auth Domain</Label>
+                <Input 
+                  id="firebase-authDomain" 
+                  value={firebaseAuthDomain} 
+                  onChange={e => setFirebaseAuthDomain(e.target.value)}
+                  disabled={firebaseConnected || isFirebaseConnecting}
+                  placeholder="projectname.firebaseapp.com" 
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="firebase-databaseURL">Database URL</Label>
+                <Input 
+                  id="firebase-databaseURL" 
+                  value={firebaseDatabaseURL} 
+                  onChange={e => setFirebaseDatabaseURL(e.target.value)}
+                  disabled={firebaseConnected || isFirebaseConnecting}
+                  placeholder="https://projectname.firebaseio.com" 
+                />
+              </div>
+              
+              <div className="grid gap-2">
+                <Label htmlFor="firebase-projectId">Project ID</Label>
+                <Input 
+                  id="firebase-projectId" 
+                  value={firebaseProjectId} 
+                  onChange={e => setFirebaseProjectId(e.target.value)}
+                  disabled={firebaseConnected || isFirebaseConnecting}
+                  placeholder="project-id" 
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  onClick={connectToFirebase}
+                  disabled={firebaseConnected || isFirebaseConnecting}
+                  className="gap-1"
+                >
+                  {isFirebaseConnecting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : firebaseConnected ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      Connected
+                    </>
+                  ) : (
+                    <>
+                      <Link2 className="h-4 w-4" />
+                      Connect Firebase
+                    </>
+                  )}
+                </Button>
+                
+                {firebaseConnected && (
+                  <Button
+                    variant="outline"
+                    className="gap-1"
+                    onClick={() => {
+                      setFirebaseConnected(false);
+                      toast.info('Disconnected from Firebase');
+                    }}
+                  >
+                    <X className="h-4 w-4" />
+                    Disconnect
+                  </Button>
                 )}
-                
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium">Connection Status</h3>
-                  <div className="p-4 rounded-md bg-muted/50 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Status</span>
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                        <span className="text-sm">{isConnected ? 'Connected' : 'Disconnected'}</span>
-                      </div>
-                    </div>
-                    
-                    {isConnected && (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">API URL</span>
-                          <span className="text-sm font-mono truncate max-w-[250px]">{connectionSettings.apiUrl}</span>
-                        </div>
-                        
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-muted-foreground">Blockchain URL</span>
-                          <span className="text-sm font-mono truncate max-w-[250px]">{connectionSettings.blockchainUrl}</span>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium">Connection Settings</h3>
-                  <div className="space-y-3">
-                    <div className="space-y-1">
-                      <Label htmlFor="api-key" className="flex items-center gap-1.5 text-xs">
-                        <KeyRound className="h-3.5 w-3.5" />
-                        API Key (Optional)
-                      </Label>
-                      <Input
-                        id="api-key"
-                        value={apiKey}
-                        onChange={(e) => setApiKey(e.target.value)}
-                        placeholder="Enter your API key if required"
-                        className="font-mono text-sm"
-                        type="password"
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <Globe className="h-3.5 w-3.5" />
-                        API URL
-                      </Label>
-                      
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-1 text-xs">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={apiInputMode === 'full' ? 'default' : 'outline'}
-                            className="text-xs h-7 px-2"
-                            onClick={() => setApiInputMode('full')}
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            Full URL
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={apiInputMode === 'host' ? 'default' : 'outline'}
-                            className="text-xs h-7 px-2"
-                            onClick={() => setApiInputMode('host')}
-                          >
-                            <Server className="h-3 w-3 mr-1" />
-                            Host + Path
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {apiInputMode === 'full' ? (
-                        <Input
-                          id="api-url"
-                          value={apiUrl}
-                          onChange={(e) => setApiUrl(e.target.value)}
-                          placeholder="http://your-api.com/threats"
-                          className="font-mono text-sm"
-                          required
-                        />
-                      ) : (
-                        <div className="space-y-2">
-                          <div className="space-y-1">
-                            <Label htmlFor="api-host" className="text-xs text-muted-foreground">Host/Domain</Label>
-                            <Input
-                              id="api-host"
-                              value={apiHost}
-                              onChange={(e) => setApiHost(e.target.value)}
-                              placeholder="example.ngrok-free.app"
-                              className="font-mono text-sm"
-                              required
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label htmlFor="api-path" className="text-xs text-muted-foreground">Path</Label>
-                            <Input
-                              id="api-path"
-                              value={apiPath}
-                              onChange={(e) => setApiPath(e.target.value)}
-                              placeholder="/fake-attacks"
-                              className="font-mono text-sm"
-                            />
-                          </div>
-                          <div className="p-2 bg-muted/30 rounded text-xs font-mono">
-                            {getFullApiUrl()}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="space-y-2 mt-4">
-                      <Label className="flex items-center gap-1.5 text-xs">
-                        <Link2 className="h-3.5 w-3.5" />
-                        Blockchain URL
-                      </Label>
-                      
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center space-x-1 text-xs">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={blockchainInputMode === 'full' ? 'default' : 'outline'}
-                            className="text-xs h-7 px-2"
-                            onClick={() => setBlockchainInputMode('full')}
-                          >
-                            <ExternalLink className="h-3 w-3 mr-1" />
-                            Full URL
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={blockchainInputMode === 'host' ? 'default' : 'outline'}
-                            className="text-xs h-7 px-2"
-                            onClick={() => setBlockchainInputMode('host')}
-                          >
-                            <Server className="h-3 w-3 mr-1" />
-                            Host + Path
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {blockchainInputMode === 'full' ? (
-                        <Input
-                          id="blockchain-url"
-                          value={blockchainUrl}
-                          onChange={(e) => setBlockchainUrl(e.target.value)}
-                          placeholder="http://your-blockchain.com/ledger"
-                          className="font-mono text-sm"
-                          required
-                        />
-                      ) : (
-                        <div className="space-y-2">
-                          <div className="space-y-1">
-                            <Label htmlFor="blockchain-host" className="text-xs text-muted-foreground">Host/Domain</Label>
-                            <Input
-                              id="blockchain-host"
-                              value={blockchainHost}
-                              onChange={(e) => setBlockchainHost(e.target.value)}
-                              placeholder="example.ngrok-free.app"
-                              className="font-mono text-sm"
-                              required
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label htmlFor="blockchain-path" className="text-xs text-muted-foreground">Path</Label>
-                            <Input
-                              id="blockchain-path"
-                              value={blockchainPath}
-                              onChange={(e) => setBlockchainPath(e.target.value)}
-                              placeholder="/chain"
-                              className="font-mono text-sm"
-                            />
-                          </div>
-                          <div className="p-2 bg-muted/30 rounded text-xs font-mono">
-                            {getFullBlockchainUrl()}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="pt-2">
-                    <Button
-                      onClick={handleConnect}
-                      className="w-full"
-                      disabled={apiInputMode === 'full' ? !apiUrl : !apiHost || 
-                               blockchainInputMode === 'full' ? !blockchainUrl : !blockchainHost}
-                    >
-                      Connect
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="space-y-4">
-                  <h3 className="text-sm font-medium">Connection Actions</h3>
-                  <div className="flex flex-col gap-2">
-                    {isConnected && (
-                      <Button 
-                        variant="destructive" 
-                        className="w-full" 
-                        onClick={onDisconnect}
-                      >
-                        <LogOut className="h-4 w-4 mr-2" />
-                        Disconnect
-                      </Button>
-                    )}
-                    
-                    <Button 
-                      variant="outline" 
-                      className="w-full" 
-                      onClick={onReset}
-                    >
-                      <RotateCcw className="h-4 w-4 mr-2" />
-                      Reset Connection Settings
-                    </Button>
-                  </div>
+              </div>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="appearance" className="space-y-6">
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Theme Settings</h3>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="theme">Select Theme</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <ThemeButton
+                    theme="light"
+                    currentTheme={theme}
+                    onClick={() => setTheme("light")}
+                  />
+                  <ThemeButton
+                    theme="dark"
+                    currentTheme={theme}
+                    onClick={() => setTheme("dark")}
+                  />
+                  <ThemeButton
+                    theme="system"
+                    currentTheme={theme}
+                    onClick={() => setTheme("system")}
+                  />
                 </div>
               </div>
-            )}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+              
+              <div className="space-y-2">
+                <h4 className="font-medium">Display Preferences</h4>
+                <div className="flex items-center space-x-2">
+                  <Switch 
+                    id="bankai-mode"
+                    checked={false}
+                    onCheckedChange={() => {
+                      toast({
+                        title: "Coming Soon",
+                        description: "Advanced display preferences will be available in an upcoming update.",
+                        variant: "default",
+                      });
+                    }}
+                  />
+                  <Label htmlFor="bankai-mode">Advanced Mode (Coming Soon)</Label>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="notifications" className="space-y-6">
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Alert Settings</h3>
+              
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="notifications" className="cursor-pointer flex items-center">
+                    <Bell className="h-4 w-4 mr-2" />
+                    Enable Notifications
+                  </Label>
+                  <Switch 
+                    id="notifications" 
+                    checked={notificationsEnabled} 
+                    onCheckedChange={setNotificationsEnabled} 
+                  />
+                </div>
+              </div>
+              
+              <div className="grid gap-2">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="sound" className="cursor-pointer flex items-center">
+                    <Volume2 className="h-4 w-4 mr-2" />
+                    Enable Sound Effects
+                  </Label>
+                  <Switch 
+                    id="sound" 
+                    checked={soundEnabled} 
+                    onCheckedChange={setSoundEnabled} 
+                  />
+                </div>
+              </div>
+              
+              {soundEnabled && (
+                <div className="grid gap-2">
+                  <Label htmlFor="volume">Sound Volume: {soundVolume}%</Label>
+                  <Slider 
+                    id="volume" 
+                    min={0} 
+                    max={100} 
+                    step={1} 
+                    defaultValue={[soundVolume]} 
+                    onValueChange={values => setSoundVolume(values[0])} 
+                  />
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </SheetContent>
+    </Sheet>
   );
 };
 

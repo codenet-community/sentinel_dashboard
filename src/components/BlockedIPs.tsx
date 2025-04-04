@@ -6,7 +6,11 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { blockedIPs } from '@/utils/attackTypes';
 import { motion } from 'framer-motion';
 
-export const BlockedIPs = () => {
+interface BlockedIPsProps {
+  isConnected?: boolean;
+}
+
+export const BlockedIPs = ({ isConnected = true }: BlockedIPsProps) => {
   const [localBlockedIPs, setLocalBlockedIPs] = useState<string[]>([]);
   const [copiedIP, setCopiedIP] = useState<string | null>(null);
 
@@ -14,15 +18,17 @@ export const BlockedIPs = () => {
     // Update the local state when blockedIPs changes
     setLocalBlockedIPs([...blockedIPs]);
     
-    // Set up interval to check for new blocked IPs
-    const interval = setInterval(() => {
-      if (JSON.stringify(localBlockedIPs) !== JSON.stringify(blockedIPs)) {
-        setLocalBlockedIPs([...blockedIPs]);
-      }
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, [localBlockedIPs]);
+    // Set up interval to check for new blocked IPs if connected
+    if (isConnected) {
+      const interval = setInterval(() => {
+        if (JSON.stringify(localBlockedIPs) !== JSON.stringify(blockedIPs)) {
+          setLocalBlockedIPs([...blockedIPs]);
+        }
+      }, 5000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [localBlockedIPs, isConnected]);
   
   const handleCopyIP = (ip: string) => {
     navigator.clipboard.writeText(ip);

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ThreatData } from '@/hooks/useThreatData';
 import { Shield, AlertTriangle, CheckCircle, Filter, Clock, Server, Zap } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
@@ -106,6 +106,20 @@ export const LiveAttackFeed = ({ threats, currentAlert, bankaiMode = false }: Li
     return attackType.toLowerCase() === 'unknown' ? 'Detected' : attackType;
   }
   
+  // Add a safe date formatting function
+  const formatSafeDate = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      if (!isValid(date)) {
+        return 'Invalid date';
+      }
+      return format(date, 'MMM dd, HH:mm:ss');
+    } catch (error) {
+      console.error('Error formatting date:', dateString, error);
+      return 'Invalid date';
+    }
+  };
+  
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="pb-2 flex-shrink-0">
@@ -167,7 +181,7 @@ export const LiveAttackFeed = ({ threats, currentAlert, bankaiMode = false }: Li
                         <h4 className="text-sm font-medium">{getAttackTypeLabel(threat.attack_type)}</h4>
                         <div className="flex items-center text-xs text-muted-foreground">
                           <Clock className="h-3 w-3 mr-1" />
-                          {format(new Date(threat.timestamp), 'MMM dd, HH:mm:ss')}
+                          {formatSafeDate(threat.timestamp)}
                         </div>
                       </div>
                     </div>

@@ -17,6 +17,7 @@ import { playAudio, initializeAudio, playThreatAlert, isAudioSupported } from '@
 import { getNewHighSeverityThreats, getAllNewThreats } from '@/utils/dataUtils';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
 
 // Create and add alert.mp3 to public folder
 const ALERT_SOUND_URL = '/alert.mp3';
@@ -34,14 +35,16 @@ const Index = () => {
     })
   );
   
-  // Fix the type error - converting string to boolean properly
-  const [soundEnabled, setSoundEnabled] = useState(() => 
-    getFromStorage('sentinel-sound-enabled', 'false') === 'true'
-  );
+  // Fix the type error - using a safer approach for string comparison
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    const stored = getFromStorage('sentinel-sound-enabled', 'false');
+    return String(stored).toLowerCase() === 'true';
+  });
   
-  const [notificationsEnabled, setNotificationsEnabled] = useState(() => 
-    getFromStorage('sentinel-notifications-enabled', 'true') === 'true'
-  );
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+    const stored = getFromStorage('sentinel-notifications-enabled', 'true');
+    return String(stored).toLowerCase() === 'true';
+  });
   
   const [soundVolume, setSoundVolume] = useState(() => {
     const volume = getFromStorage('sentinel-sound-volume', '70');
@@ -141,14 +144,11 @@ const Index = () => {
     reconnectAttempts,
     isReconnecting,
     usingFallbackData,
-    apiConnected,
-    blockchainConnected,
-    connectToSources,
-    disconnect,
-    fetchThreatData,
-    fetchBlockchainData,
+    firebaseConnected,
     bankaiMode,
-    setBankaiMode
+    setBankaiMode,
+    connectToFirebase,
+    disconnect
   } = useThreatData(persistedSettings);
   
   const toggleSound = useCallback(() => {
@@ -160,12 +160,12 @@ const Index = () => {
     if (persistedSettings.apiUrl && persistedSettings.blockchainUrl && !isConnected && !isLoading && !isReconnecting) {
       try {
         console.log('Attempting to connect with stored settings');
-        connectToSources();
+        connectToFirebase();
       } catch (error) {
         console.error('Error connecting to sources:', error);
       }
     }
-  }, [persistedSettings, isConnected, isLoading, isReconnecting, connectToSources]);
+  }, [persistedSettings, isConnected, isLoading, isReconnecting, connectToFirebase]);
   
   // Handle threats for alerts - now playing sounds for all new threats
   useEffect(() => {
@@ -210,19 +210,22 @@ const Index = () => {
     }
   }, [threatData, alertHistory, soundEnabled, soundVolume, audioLoaded, notificationsEnabled]);
   
-  // Safely validate URLs and connect
-  const handleConnect = useCallback((apiKey: string, apiUrl: string, blockchainUrl: string) => {
+  // Modified connection handling to use Firebase
+  const handleConnect = useCallback(() => {
     try {
-      // Store the new settings
-      const newSettings = { apiKey, apiUrl, blockchainUrl };
-      setPersistedSettings(newSettings);
-      
-      // Try to connect with the new settings
-      connectToSources();
+      connectToFirebase();
     } catch (err) {
-      console.error("Error in handleConnect:", err);
+      console.error("Error connecting to Firebase:", err);
     }
-  }, [connectToSources]);
+  }, [connectToFirebase]);
+  
+  // Update the useEffect for auto-connecting
+  useEffect(() => {
+    if (!isConnected && !isLoading) {
+      console.log('Auto-connecting to Firebase in Index page');
+      connectToFirebase();
+    }
+  }, [isConnected, isLoading, connectToFirebase]);
   
   const handleDisconnect = useCallback(() => {
     disconnect();
@@ -235,11 +238,11 @@ const Index = () => {
   }, [disconnect]);
   
   useEffect(() => {
-    if (isConnected && blockchainConnected) {
+    if (isConnected && firebaseConnected) {
       // We've removed the toast notification here
       // to reduce the number of notifications
     }
-  }, [isConnected, blockchainConnected]);
+  }, [isConnected, firebaseConnected]);
   
   // Handle opening settings dialog
   const handleOpenSettings = useCallback(() => {
@@ -247,6 +250,22 @@ const Index = () => {
       settingsTriggerRef.current.click();
     }
   }, []);
+  
+  const handleRefreshData = useCallback(() => {
+    console.log('Manual refresh triggered');
+    connectToFirebase();
+    
+    toast.info('Refreshing data...', {
+      duration: 2000
+    });
+  }, [connectToFirebase]);
+  
+  useEffect(() => {
+    // Update localStorage when changes are made to these settings
+    localStorage.setItem('threat-sound-enabled', soundEnabled.toString());
+    localStorage.setItem('threat-notifications-enabled', notificationsEnabled.toString());
+    localStorage.setItem('threat-sound-volume', String(soundVolume));
+  }, [soundEnabled, notificationsEnabled, soundVolume]);
   
   return (
     <ThemeProvider defaultTheme="dark">
@@ -278,8 +297,8 @@ const Index = () => {
                 isReconnecting={isReconnecting}
                 reconnectAttempts={reconnectAttempts} 
                 usingFallbackData={usingFallbackData}
-                apiConnected={apiConnected}
-                blockchainConnected={blockchainConnected}
+                apiConnected={firebaseConnected}
+                blockchainConnected={firebaseConnected}
               />
             </div>
           )}
@@ -366,7 +385,7 @@ const Index = () => {
                     </div>
                   </div>
                   <div className="md:col-span-4 h-[400px]">
-                    <BlockedIPs apiConnected={apiConnected} />
+                    <BlockedIPs isConnected={isConnected} />
                   </div>
                 </section>
 

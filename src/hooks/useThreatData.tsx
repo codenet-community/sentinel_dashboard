@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 import { generateDemoData } from '@/utils/demoData';
 import { AttackType } from '@/utils/attackTypes';
+import { initializeApp } from 'firebase/app';
+import { getDatabase, ref, onValue } from 'firebase/database';
 
 export interface ThreatDetail {
   url_path: string;
@@ -36,6 +38,24 @@ export interface BlockchainData {
   length: number;
 }
 
+export interface ThreatLedger {
+  [key: string]: {
+    timestamp: string;
+    analysisId: string;
+    totalThreats: number;
+    threatTypes: Record<string, number>;
+    threats: ThreatData[];
+    stats: {
+      totalEntries: number;
+      threatCount: number;
+      normalCount: number;
+      attackTypes: Record<string, number>;
+      protocols: Record<string, number>;
+      services: Record<string, number>;
+    };
+  }
+}
+
 interface useThreatDataProps {
   apiKey?: string;
   apiUrl?: string;
@@ -58,6 +78,12 @@ const useThreatData = (settings: useThreatDataProps) => {
   const [apiConnected, setApiConnected] = useState(false);
   const [usingFallbackData, setUsingFallbackData] = useState(false);
   const [bankaiMode, setBankaiMode] = useState(false);
+  
+  // Firebase state
+  const [firebaseConnected, setFirebaseConnected] = useState(false);
+  const [threatLedger, setThreatLedger] = useState<ThreatLedger | null>(null);
+  const firebaseAppRef = useRef<any>(null);
+  const firebaseDatabaseRef = useRef<any>(null);
   
   const { blockchainUrl, apiUrl } = settings;
   
@@ -112,104 +138,158 @@ const useThreatData = (settings: useThreatDataProps) => {
     return demoDataRef.current.data;
   }, []);
 
-  const fetchBlockchainData = useCallback(async () => {
-    if (!blockchainUrl) return { success: false };
+  // Firebase configuration - using the credentials specified elsewhere in the app
+  const firebaseConfig = {
+    apiKey: "AIzaSyBSbonwVE3PPXIIrSrvrB75u2AQ_B_Tni4",
+    authDomain: "discraft-c1c41.firebaseapp.com",
+    databaseURL: "https://discraft-c1c41-default-rtdb.firebaseio.com",
+    projectId: "discraft-c1c41",
+    storageBucket: "discraft-c1c41.appspot.com",
+    messagingSenderId: "525620150766",
+    appId: "1:525620150766:web:a426e68d206c68764aceff"
+  };
 
-    if (isDemoMode()) {
-      try {
-        const demoData = getDemoData();
-        
-        const processedThreats = processBlockchainData(demoData);
-        
-        setThreatData(processedThreats);
-        setBlockchainData(demoData);
-        setLastUpdated(new Date());
-        setLastSuccessfulFetch(new Date());
-        setBlockchainConnected(true);
-        setApiConnected(true);
-        setUsingFallbackData(true);
-        
-        if (isReconnecting) {
-          setIsReconnecting(false);
-          setReconnectAttempts(0);
-          toast.success('Connected to demo blockchain');
-        }
-        
-        return { success: true };
-      } catch (err) {
-        console.error("Error generating demo data:", err);
-        return { success: false };
-      }
-    }
-    
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    
-    abortControllerRef.current = new AbortController();
+  const connectToFirebase = useCallback(async () => {
+    console.log('🔥 useThreatData: Attempting to connect to Firebase...');
+    setIsLoading(true);
+    setError(null);
+    setConnectionError(null);
     
     try {
-      // Use relative API path if in production on Vercel
-      const urlToFetch = process.env.NODE_ENV === "production" && 
-                        blockchainUrl.startsWith('/') ? blockchainUrl : blockchainUrl;
-      
-      const response = await fetch(urlToFetch, {
-        signal: abortControllerRef.current.signal,
-        cache: 'no-store'
-      });
-      
-      if (!response.ok) {
-        throw new Error(`Blockchain request failed with status ${response.status}`);
-      }
-      
-      const data: BlockchainData = await response.json();
-      
-      if (!data.chain || !Array.isArray(data.chain)) {
-        throw new Error("Invalid blockchain data format");
-      }
-      
-      const processedThreats = processBlockchainData(data);
-      
-      const currentDataJson = JSON.stringify(processedThreats);
-      const previousDataJson = JSON.stringify(previousThreatDataRef.current);
-      
-      if (currentDataJson !== previousDataJson) {
-        const newThreats = processedThreats.filter(t => !seenThreatIdsRef.current.has(t.id));
-        processedThreats.forEach(t => seenThreatIdsRef.current.add(t.id));
-        previousThreatDataRef.current = processedThreats;
-        setThreatData(processedThreats);
-      }
-      
-      setBlockchainData(data);
-      setLastUpdated(new Date());
-      setLastSuccessfulFetch(new Date());
-      setBlockchainConnected(true);
-      setUsingFallbackData(false);
-      
-      if (isReconnecting) {
-        setIsReconnecting(false);
-        setReconnectAttempts(0);
-        toast.success('Reconnected to blockchain');
+      if (!firebaseAppRef.current) {
+        console.log('🔥 useThreatData: No existing Firebase app found, initializing new connection');
+        
+        try {
+          // Initialize Firebase
+          console.log('🔥 useThreatData: Initializing Firebase app...');
+          firebaseAppRef.current = initializeApp(firebaseConfig);
+          console.log('🔥 useThreatData: Firebase app initialized successfully:', firebaseAppRef.current.name);
+        } catch (initError) {
+          console.error('🔥 useThreatData: Error initializing Firebase app:', initError);
+          throw new Error(`Firebase initialization failed: ${(initError as Error).message}`);
+        }
+        
+        try {
+          // Get a reference to the database service
+          console.log('🔥 useThreatData: Getting database reference...');
+          firebaseDatabaseRef.current = getDatabase(firebaseAppRef.current);
+          console.log('🔥 useThreatData: Database reference obtained successfully');
+        } catch (dbError) {
+          console.error('🔥 useThreatData: Error getting database reference:', dbError);
+          throw new Error(`Database connection failed: ${(dbError as Error).message}`);
+        }
+        
+        // Set up listener for threat ledger data
+        try {
+          console.log('🔥 useThreatData: Setting up threat ledger listener');
+          const threatLedgerRef = ref(firebaseDatabaseRef.current, 'threatLedger');
+          onValue(threatLedgerRef, (snapshot) => {
+            console.log('🔥 useThreatData: Received threat ledger snapshot');
+            const data = snapshot.val() as ThreatLedger;
+            if (data) {
+              console.log('🔥 useThreatData: Processing threat ledger data', Object.keys(data).length, 'entries');
+              setThreatLedger(data);
+              
+              // Convert the first ledger entry's threats to our ThreatData format
+              const firstEntryKey = Object.keys(data)[0];
+              if (firstEntryKey && data[firstEntryKey]?.threats) {
+                const threats = data[firstEntryKey].threats.map(threat => {
+                  // Ensure timestamp is valid
+                  let validTimestamp = threat.timestamp;
+                  try {
+                    // Check if timestamp is valid, if not use current time
+                    const date = new Date(threat.timestamp);
+                    if (isNaN(date.getTime())) {
+                      console.warn('Invalid timestamp detected:', threat.timestamp);
+                      validTimestamp = new Date().toISOString();
+                    }
+                  } catch (error) {
+                    console.error('Error parsing timestamp:', threat.timestamp, error);
+                    validTimestamp = new Date().toISOString();
+                  }
+                  
+                  return {
+                    attack_type: threat.attackType,
+                    details: {
+                      url_path: threat.info,
+                      protocol: threat.protocol,
+                    },
+                    id: `${threat.sourceIP}-${validTimestamp}`,
+                    ip: threat.sourceIP,
+                    severity: threat.severity,
+                    status: threat.isThreat ? "Active" : "Mitigated",
+                    timestamp: validTimestamp
+                  };
+                });
+                
+                setThreatData(threats);
+                
+                // Create a blockchain-like structure for backward compatibility
+                const chainBlocks = threats.map(threat => ({
+                  data: threat,
+                  data_hash: Math.random().toString(36).substr(2, 9),
+                  hash: Math.random().toString(36).substr(2, 9),
+                  previous_hash: Math.random().toString(36).substr(2, 9),
+                  timestamp: new Date().toISOString()
+                }));
+                
+                setBlockchainData({
+                  chain: chainBlocks,
+                  length: chainBlocks.length
+                });
+              }
+              
+              setLastUpdated(new Date());
+              setLastSuccessfulFetch(new Date());
+              setIsConnected(true);
+              setFirebaseConnected(true);
+              setBlockchainConnected(true); // For backward compatibility
+              setApiConnected(true); // For backward compatibility
+              
+              toast.success('Connected to Firebase threat data');
+            }
+          }, (error) => {
+            console.error('🔥 useThreatData: Threat ledger data retrieval error:', error);
+            setError(`Firebase error: ${error.message}`);
+            setConnectionError(`Failed to retrieve threat data: ${error.message}`);
+            setIsConnected(false);
+            setFirebaseConnected(false);
+            throw new Error(`Firebase data error: ${error.message}`);
+          });
+        } catch (threatLedgerError) {
+          console.error('🔥 useThreatData: Failed to set up threat ledger:', threatLedgerError);
+          throw new Error('Could not access threat ledger');
+        }
       }
       
       return { success: true };
     } catch (err) {
-      if (err instanceof Error && err.name !== 'AbortError') {
-        console.error("Error fetching blockchain data:", err.message);
-        setError(err.message);
-        setBlockchainConnected(false);
-        
-        if (isConnected && !isReconnecting) {
-          setIsReconnecting(true);
-          toast.error('Connection to blockchain lost. Attempting to reconnect...');
-        }
-        
-        scheduleReconnect();
-      }
+      const errorMessage = err instanceof Error ? err.message : 'Connection failed';
+      setConnectionError(errorMessage);
+      setError(errorMessage);
+      setIsConnected(false);
+      setFirebaseConnected(false);
+      setBlockchainConnected(false);
+      setApiConnected(false);
+      toast.error(`Failed to connect to Firebase: ${errorMessage}`);
       return { success: false };
+    } finally {
+      setIsLoading(false);
     }
-  }, [blockchainUrl, isConnected, isReconnecting, isDemoMode, getDemoData]);
+  }, []);
 
+  // Replace the original fetchBlockchainData with one that gets data from Firebase
+  const fetchBlockchainData = useCallback(async () => {
+    if (!firebaseConnected) {
+      // If we're not connected to Firebase yet, try connecting
+      return connectToFirebase();
+    } else {
+      // We're already connected and the onValue listener will update the data
+      return { success: true };
+    }
+  }, [firebaseConnected, connectToFirebase]);
+
+  // Add the missing scheduleReconnect function
   const scheduleReconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
       window.clearTimeout(reconnectTimeoutRef.current);
@@ -219,15 +299,17 @@ const useThreatData = (settings: useThreatDataProps) => {
     
     reconnectTimeoutRef.current = window.setTimeout(() => {
       setReconnectAttempts(prev => prev + 1);
-      fetchBlockchainData();
+      connectToFirebase();
     }, delay);
-  }, [reconnectAttempts, fetchBlockchainData]);
+  }, [reconnectAttempts, connectToFirebase]);
 
+  // For backwards compatibility, maintain this function but make it use Firebase
+  const connectToSources = useCallback(async () => {
+    return connectToFirebase();
+  }, [connectToFirebase]);
+
+  // For backwards compatibility, maintain this function but make it close Firebase
   const disconnect = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    
     if (intervalRef.current) {
       window.clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -240,63 +322,20 @@ const useThreatData = (settings: useThreatDataProps) => {
     
     setIsConnected(false);
     setBlockchainConnected(false);
+    setFirebaseConnected(false);
+    setApiConnected(false);
     setIsReconnecting(false);
     setReconnectAttempts(0);
-    toast.info('Disconnected from blockchain');
+    toast.info('Disconnected from Firebase');
   }, []);
 
-  const connectToSources = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    setConnectionError(null);
-    setApiConnected(false);
-    setBlockchainConnected(false);
-    setUsingFallbackData(false);
-    
-    if (!isDemoMode()) {
-      try {
-        if (blockchainUrl) new URL(blockchainUrl);
-        if (apiUrl) new URL(apiUrl);
-      } catch (err) {
-        setConnectionError("Invalid URL format");
-        setIsLoading(false);
-        toast.error('Invalid URL format');
-        return;
-      }
-    }
-    
-    if (intervalRef.current) {
-      window.clearInterval(intervalRef.current);
-    }
-    
-    try {
-      const blockchainResult = await fetchBlockchainData();
-      
-      if (blockchainResult.success) {
-        setIsConnected(true);
-        setBlockchainConnected(true);
-        setApiConnected(isDemoMode() ? true : !!apiUrl);
-        setUsingFallbackData(isDemoMode());
-        intervalRef.current = window.setInterval(fetchBlockchainData, 5000);
-        toast.success(isDemoMode() ? 'Connected to demo data' : 'Connected to blockchain');
-      } else {
-        setConnectionError("Failed to connect to " + (isDemoMode() ? "demo data" : "blockchain"));
-        toast.error("Failed to connect to " + (isDemoMode() ? "demo data" : "blockchain"));
-      }
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Connection failed';
-      setConnectionError(errorMessage);
-      setError(errorMessage);
-      setIsConnected(false);
-      setBlockchainConnected(false);
-      setApiConnected(false);
-      toast.error('Failed to connect to blockchain');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [fetchBlockchainData, blockchainUrl, apiUrl, isDemoMode]);
-
+  // Connect to Firebase on component mount
   useEffect(() => {
+    if (!isConnected && !isLoading && !isReconnecting) {
+      console.log('Automatically connecting to Firebase in useThreatData');
+      connectToFirebase();
+    }
+    
     return () => {
       if (intervalRef.current) window.clearInterval(intervalRef.current);
       if (reconnectTimeoutRef.current) window.clearTimeout(reconnectTimeoutRef.current);
@@ -339,11 +378,14 @@ const useThreatData = (settings: useThreatDataProps) => {
     reconnectAttempts,
     isReconnecting,
     usingFallbackData,
-    blockchainConnected,
-    apiConnected,
+    blockchainConnected: firebaseConnected, // Use Firebase connection status
+    apiConnected: firebaseConnected, // Use Firebase connection status
+    firebaseConnected,
+    threatLedger,
     connectToSources,
     disconnect,
     fetchBlockchainData,
+    connectToFirebase,
     bankaiMode,
     setBankaiMode
   };
