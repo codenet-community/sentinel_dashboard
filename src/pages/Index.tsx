@@ -13,8 +13,8 @@ import { useThreatData, ThreatData } from '@/hooks/useThreatData';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Shield, AlertOctagon, Settings } from 'lucide-react';
 import { getFromStorage, saveToStorage } from '@/utils/storageUtils';
-import { playAudio, initializeAudio } from '@/utils/audioUtils';
-import { getNewHighSeverityThreats } from '@/utils/dataUtils';
+import { playAudio, initializeAudio, playThreatAlert, isAudioSupported } from '@/utils/audioUtils';
+import { getNewHighSeverityThreats, getAllNewThreats } from '@/utils/dataUtils';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 
@@ -78,7 +78,7 @@ const Index = () => {
 
   // Improved audio loading with better error handling
   useEffect(() => {
-    if (!audioRef.current) {
+    if (!audioRef.current && isAudioSupported()) {
       try {
         // Create audio element and set its properties
         audioRef.current = initializeAudio(ALERT_SOUND_URL);
@@ -88,6 +88,21 @@ const Index = () => {
             console.log('Audio loaded successfully');
             setAudioLoaded(true);
             setAudioError(null);
+            
+            // Play a test sound at very low volume to initialize audio context
+            // This helps overcome browser autoplay restrictions
+            if (audioRef.current) {
+              audioRef.current.volume = 0.01; // Very low volume
+              audioRef.current.play()
+                .then(() => {
+                  audioRef.current?.pause();
+                  audioRef.current!.currentTime = 0;
+                })
+                .catch(() => {
+                  // Silently catch the error - this is expected in many browsers
+                  console.info('Initial audio test was blocked - this is normal');
+                });
+            }
           };
           
           const handleAudioError = (e: ErrorEvent) => {
@@ -152,28 +167,48 @@ const Index = () => {
     }
   }, [persistedSettings, isConnected, isLoading, isReconnecting, connectToSources]);
   
-  // Handle high severity threats for alerts
+  // Handle threats for alerts - now playing sounds for all new threats
   useEffect(() => {
-    if (!threatData.length || !notificationsEnabled) return;
+    if (!threatData.length) return;
     
     try {
-      const highSeverityThreats = getNewHighSeverityThreats(threatData, alertHistory);
+      // First, check for ALL new threats to play sounds
+      const allNewThreats = getAllNewThreats(threatData, alertHistory);
       
-      if (highSeverityThreats.length > 0) {
-        setCurrentAlert(highSeverityThreats[0]);
-        setAlertHistory(prev => [...prev, highSeverityThreats[0].id]);
+      if (allNewThreats.length > 0) {
+        // Add to alert history to avoid repeating alerts
+        setAlertHistory(prev => [...prev, ...allNewThreats.map(t => t.id)]);
         
-        // Play sound for high severity threats if enabled
-        if (soundEnabled && audioRef.current && audioLoaded) {
-          playAudio(audioRef.current, soundVolume).catch(err => {
-            console.error('Failed to play alert sound:', err);
+        // Always play sound for new threats if sound is enabled, regardless of notification settings
+        if (soundEnabled && audioLoaded) {
+          // Determine severity for appropriate sound
+          const highestSeverityThreat = allNewThreats.find(t => t.severity === 'High') || 
+                                        allNewThreats.find(t => t.severity === 'Medium') || 
+                                        allNewThreats[0];
+          
+          // Play sound based on highest severity detected
+          const volumeLevel = highestSeverityThreat.severity === 'High' ? soundVolume : soundVolume * 0.7;
+          playThreatAlert(highestSeverityThreat.severity, volumeLevel).catch(err => {
+            console.error('Failed to play threat alert sound:', err);
           });
+        }
+        
+        // Only set visual alert if notifications are enabled and there's a high severity threat
+        if (notificationsEnabled) {
+          const highSeverityThreats = allNewThreats.filter(t => 
+            (t.severity === 'High' || t.severity === 'Medium') && 
+            t.status !== 'Mitigated'
+          );
+          
+          if (highSeverityThreats.length > 0) {
+            setCurrentAlert(highSeverityThreats[0]);
+          }
         }
       }
     } catch (error) {
       console.error('Error processing threats for alerts:', error);
     }
-  }, [threatData, notificationsEnabled, alertHistory, soundEnabled, soundVolume, audioLoaded]);
+  }, [threatData, alertHistory, soundEnabled, soundVolume, audioLoaded, notificationsEnabled]);
   
   // Safely validate URLs and connect
   const handleConnect = useCallback((apiKey: string, apiUrl: string, blockchainUrl: string) => {

@@ -12,7 +12,13 @@ const getRandomRecentDate = (): string => {
   now.setMinutes(now.getMinutes() - minutesAgo);
   now.setSeconds(now.getSeconds() - secondsAgo);
   
-  return now.toISOString();
+  // Format date as YYYY-MM-DD HH:MM:SS
+  return now.getFullYear() + '-' + 
+    String(now.getMonth() + 1).padStart(2, '0') + '-' +
+    String(now.getDate()).padStart(2, '0') + ' ' +
+    String(now.getHours()).padStart(2, '0') + ':' +
+    String(now.getMinutes()).padStart(2, '0') + ':' +
+    String(now.getSeconds()).padStart(2, '0');
 };
 
 // Function to generate random IP addresses
@@ -111,11 +117,27 @@ const generateThreatData = (): ThreatData => {
     severity = 'Low';
   }
   
-  // Bias towards active status (70% active, 30% mitigated)
-  const status = Math.random() < 0.7 ? 'Active' : 'Mitigated';
+  // Generate a more realistic status - use "Detected" for new threats
+  // Bias towards "Detected" status (70%), with others being "Mitigated", "Investigating", or "Blocked"
+  const statusRoll = Math.random();
+  let status: string;
+  if (statusRoll < 0.7) {
+    status = 'Detected';
+  } else if (statusRoll < 0.8) {
+    status = 'Mitigated';
+  } else if (statusRoll < 0.9) {
+    status = 'Investigating';
+  } else {
+    status = 'Blocked';
+  }
+  
+  // Generate unique ID with timestamp and random string
+  const timestamp = Date.now();
+  const randomPart = Math.random().toString(36).substring(2, 9);
+  const id = `threat-${timestamp}-${randomPart}`;
   
   return {
-    id: uuidv4(),
+    id,
     attack_type: attackTypes[Math.floor(Math.random() * attackTypes.length)],
     ip: getRandomIP(),
     severity,
@@ -124,7 +146,7 @@ const generateThreatData = (): ThreatData => {
     details: {
       destination_port: getRandomPort(),
       source_port: getRandomPort(),
-      protocol: protocols[Math.floor(Math.random() * protocols.length)],
+      protocol: protocols[Math.floor(Math.random() * protocols.length)].toLowerCase(),
       url_path: urlPaths[Math.floor(Math.random() * urlPaths.length)],
       method: methods[Math.floor(Math.random() * methods.length)],
       user_agent: userAgents[Math.floor(Math.random() * userAgents.length)],

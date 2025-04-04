@@ -10,6 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Network, Shield, Volume2, Bell, Trash2, Settings, Wifi, RefreshCcw, Save, Check, X, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { isValidUrl } from '@/utils/dataUtils';
+import { playThreatAlert } from '@/utils/audioUtils';
 
 interface SettingsPanelProps {
   connectionSettings: {

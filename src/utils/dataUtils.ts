@@ -1,4 +1,3 @@
-
 /**
  * Utility functions for working with threat data
  */
@@ -44,14 +43,27 @@ export function hasThreatsChanged(oldThreats: ThreatData[], newThreats: ThreatDa
 }
 
 /**
- * Filters high severity threats that haven't been mitigated
+ * Filters high or medium severity threats that haven't been mitigated
  * @param threats Array of threats
  * @param alertHistory Array of already alerted threat IDs
- * @returns Array of high severity threats that haven't been alerted yet
+ * @returns Array of high or medium severity threats that haven't been alerted yet
  */
 export function getNewHighSeverityThreats(threats: ThreatData[], alertHistory: string[]): ThreatData[] {
   return threats.filter(threat => 
-    threat.severity === 'High' && 
+    (threat.severity === 'High' || threat.severity === 'Medium') && 
+    threat.status !== 'Mitigated' && 
+    !alertHistory.includes(threat.id)
+  );
+}
+
+/**
+ * Filters all new threats that haven't been seen before, regardless of severity
+ * @param threats Array of threats
+ * @param alertHistory Array of already alerted threat IDs
+ * @returns Array of all new threats that haven't been alerted yet
+ */
+export function getAllNewThreats(threats: ThreatData[], alertHistory: string[]): ThreatData[] {
+  return threats.filter(threat => 
     threat.status !== 'Mitigated' && 
     !alertHistory.includes(threat.id)
   );

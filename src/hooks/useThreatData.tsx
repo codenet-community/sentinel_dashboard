@@ -7,9 +7,10 @@ export interface ThreatDetail {
   url_path: string;
   protocol?: string;
   destination_port?: number;
+  source_port?: number;
   user_agent?: string;
   method?: string;
-  target_resource?: string;
+  flag?: string;
 }
 
 export interface ThreatData {

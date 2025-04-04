@@ -83,12 +83,21 @@ const ThreatMap = ({ threats, bankaiMode = false }: ThreatMapProps) => {
     
     // Draw threat points
     processedThreats.forEach((threat) => {
-      if (!threat.coordinates) return;
+      // Generate pseudo-coordinates from the IP address since coordinates aren't in our data format
+      // This just creates a deterministic mapping from IP to a location on the map
+      const ipParts = threat.ip.split('.');
+      const ipSum = ipParts.reduce((acc, part) => acc + parseInt(part, 10), 0);
+      
+      // Generate latitude between -85 and 85 (avoid poles)
+      const lat = -85 + (ipSum % 170);
+      
+      // Generate longitude between -180 and 180
+      const lng = -180 + ((ipSum * ipParts.length) % 360);
       
       // Convert lat/lng to canvas x/y
       // This is a simple projection, not geographically accurate
-      const x = ((threat.coordinates[1] + 180) / 360) * canvas.width;
-      const y = ((90 - threat.coordinates[0]) / 180) * canvas.height;
+      const x = ((lng + 180) / 360) * canvas.width;
+      const y = ((90 - lat) / 180) * canvas.height;
       
       // Choose color based on severity
       let color;

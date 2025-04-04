@@ -1,4 +1,3 @@
-
 /**
  * Utility functions for handling audio in the application
  */
@@ -72,4 +71,62 @@ export const initializeAudio = (audioUrl: string): HTMLAudioElement | null => {
     console.error('Error initializing audio:', error);
     return null;
   }
+};
+
+/**
+ * Plays the appropriate alert sound based on threat severity
+ * @param severity The severity level of the threat ('High', 'Medium', 'Low')
+ * @param volume Volume level (0-100)
+ * @returns Promise that resolves when audio starts playing or rejects with error
+ */
+export const playThreatAlert = (severity: string, volume: number): Promise<void> => {
+  let audioUrl = '/alert.mp3'; // Default alert sound
+  
+  // Create a fresh audio element each time to avoid blocking issues
+  try {
+    const audio = new Audio(audioUrl);
+    
+    // Set audio properties based on severity
+    audio.volume = Math.max(0, Math.min(volume / 100, 1));
+    
+    // Adjust playback rate based on severity for different alert feelings
+    if (severity === 'High') {
+      audio.playbackRate = 1.0; // Normal speed for high severity
+    } else if (severity === 'Medium') {
+      audio.playbackRate = 0.9; // Slightly slower for medium
+    } else {
+      audio.playbackRate = 0.8; // Even slower for low severity
+    }
+    
+    // Force load the audio
+    audio.load();
+    
+    // Play with proper error handling
+    const playPromise = audio.play();
+    
+    if (playPromise !== undefined) {
+      return playPromise
+        .then(() => {
+          console.log(`Alert sound playing for ${severity} severity threat`);
+          return Promise.resolve();
+        })
+        .catch(error => {
+          console.error('Error playing threat alert:', error);
+          return Promise.reject(error);
+        });
+    } else {
+      return Promise.resolve(); // Old browsers fallback
+    }
+  } catch (error) {
+    console.error('Error creating threat alert:', error);
+    return Promise.reject(error);
+  }
+};
+
+/**
+ * Check if browser supports audio playback
+ * @returns True if browser supports audio playback, false otherwise
+ */
+export const isAudioSupported = (): boolean => {
+  return typeof Audio !== 'undefined';
 };
