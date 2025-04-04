@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import BlockchainAnalytics from "./pages/BlockchainAnalytics";
 import CyberGuardDashboard from "./pages/CyberGuardDashboard";
+import CyberForge from "./pages/CyberForge";
 
 const queryClient = new QueryClient();
 
@@ -23,6 +24,8 @@ const App = () => (
             <Route path="/blockchain-analytics" element={<BlockchainAnalytics />} />
             <Route path="/cyber-guard" element={<CyberGuardDashboard />} />
             <Route path="/cyberguard" element={<CyberGuardDashboard />} />
+            <Route path="/cyber-forge" element={<CyberForge />} />
+            <Route path="/cyberforge" element={<CyberForge />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

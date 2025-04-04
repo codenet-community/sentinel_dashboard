@@ -372,8 +372,15 @@ const Index = () => {
 
                 <section className="mb-6">
                   <div className="bg-background/60 backdrop-blur-sm border border-border/50 rounded-lg shadow-md">
-                    <div className="p-4 border-b border-border/50">
+                    <div className="p-4 border-b border-border/50 flex justify-between items-center">
                       <h2 className="text-lg font-medium">Threat Trends</h2>
+                      <button 
+                        onClick={() => navigate('/cyberforge')}
+                        className="flex items-center text-sm bg-primary text-white px-4 py-2 rounded-md transition-colors hover:bg-primary/90"
+                      >
+                        <Shield className="h-4 w-4 mr-2" />
+                        CyberForge Solutions
+                      </button>
                     </div>
                     <div className="p-4">
                       <ThreatTrends threats={threatData} />
