@@ -42,7 +42,7 @@ interface useThreatDataProps {
   blockchainUrl?: string;
 }
 
-export const useThreatData = (settings: useThreatDataProps) => {
+const useThreatData = (settings: useThreatDataProps) => {
   const [isConnected, setIsConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [threatData, setThreatData] = useState<ThreatData[]>([]);
@@ -149,7 +149,11 @@ export const useThreatData = (settings: useThreatDataProps) => {
     abortControllerRef.current = new AbortController();
     
     try {
-      const response = await fetch(blockchainUrl, {
+      // Use relative API path if in production on Vercel
+      const urlToFetch = process.env.NODE_ENV === "production" && 
+                        blockchainUrl.startsWith('/') ? blockchainUrl : blockchainUrl;
+      
+      const response = await fetch(urlToFetch, {
         signal: abortControllerRef.current.signal,
         cache: 'no-store'
       });
@@ -344,3 +348,6 @@ export const useThreatData = (settings: useThreatDataProps) => {
     setBankaiMode
   };
 };
+
+export { useThreatData };
+export default useThreatData;
