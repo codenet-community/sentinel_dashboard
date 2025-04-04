@@ -394,7 +394,7 @@ const Index = () => {
                     <div className="p-4 border-b border-border/50 flex justify-between items-center">
                       <h2 className="text-lg font-medium">Threat Trends</h2>
                       <button 
-                        onClick={() => navigate('/cyberforge')}
+                        onClick={() => navigate('/cyber-forge')}
                         className="flex items-center text-sm bg-primary text-white px-4 py-2 rounded-md transition-colors hover:bg-primary/90"
                       >
                         <Shield className="h-4 w-4 mr-2" />

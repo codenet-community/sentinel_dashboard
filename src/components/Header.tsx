@@ -89,6 +89,9 @@ const Header = forwardRef<HTMLButtonElement, HeaderProps>(function Header(
             <Link to="/cyber-guard">
               <Button variant="ghost" size="sm">CyberGuard</Button>
             </Link>
+            <Link to="/cyber-forge">
+              <Button variant="ghost" size="sm">CyberForge</Button>
+            </Link>
             <Link to="/blockchain-analytics">
               <Button variant="ghost" size="sm">Blockchain</Button>
             </Link>

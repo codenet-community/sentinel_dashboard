@@ -24,4 +24,11 @@ export default defineConfig(({ mode }) => ({
     // Ensure paths are relative for Vercel deployment
     assetsDir: "assets",
   },
+  preview: {
+    // Setup SPA fallback for client-side routing
+    port: 8080,
+    host: true,
+  },
+  // Support client-side routing by redirecting all requests to index.html
+  appType: 'spa', // Enable SPA mode for proper routing
 }));
